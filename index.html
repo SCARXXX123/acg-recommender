@@ -1,0 +1,711 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+  <meta charset="UTF-8">
+  <title>ACG VN Recommender</title>
+  <link rel="icon" href="./public/favicon.ico">
+  <style>
+    body {
+      font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+      background: #f0f2f5;
+      padding: 20px;
+    }
+
+    h1 {
+      text-align: center;
+      color: #333;
+    }
+
+    #container {
+      max-width: 700px;
+      margin: 0 auto;
+      background: #fff;
+      padding: 20px;
+      border-radius: 12px;
+      box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+    }
+
+    textarea {
+      width: 100%;
+      height: 80px;
+      padding: 10px;
+      font-size: 16px;
+      border-radius: 8px;
+      border: 1px solid #ccc;
+      resize: vertical;
+      box-sizing: border-box;
+    }
+
+    .searchBtn {
+      display: block;
+      /* 让它成为块级元素 */
+      margin: 30px auto;
+      /* 上下 10px，左右自动居中 */
+      padding: 10px 20px;
+      font-size: 16px;
+      border: none;
+      border-radius: 8px;
+      background: #0078d4;
+      color: white;
+      cursor: pointer;
+    }
+
+    button {
+      margin-top: 10px;
+      padding: 10px 20px;
+      font-size: 16px;
+      border: none;
+      border-radius: 8px;
+      background: #0078d4;
+      color: white;
+      cursor: pointer;
+    }
+
+    button:hover {
+      background: #005a9e;
+    }
+
+    #results {
+      margin-top: 20px;
+    }
+
+    .vn-card {
+      border: 1px solid #ddd;
+      border-radius: 10px;
+      padding: 10px;
+      margin-bottom: 10px;
+      background: #fafafa;
+    }
+
+    .vn-card h3 {
+      margin: 0;
+      font-size: 18px;
+    }
+
+    .vn-card p {
+      margin: 5px 0 0 0;
+      font-size: 14px;
+      color: #555;
+    }
+
+    .toggleBtn {
+      margin-top: 5px;
+      padding: 3px 8px;
+      font-size: 12px;
+      background: #ccc;
+      color: #333;
+      border-radius: 5px;
+      cursor: pointer;
+    }
+
+    .toggleBtn:hover {
+      background: #bbb;
+    }
+
+    #loadMore {
+      display: block;
+      width: 100%;
+      text-align: center;
+      margin-top: 10px;
+    }
+
+    .type-switch {
+      display: flex;
+      justify-content: center;
+      gap: 20px;
+      margin: 12px 0;
+    }
+
+    .type-option {
+      display: flex;
+      align-items: center;
+      cursor: pointer;
+      user-select: none;
+      font-size: 14px;
+      color: #555;
+    }
+
+    .type-option input {
+      display: none;
+    }
+
+    .type-option span {
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      border: 2px solid #bbb;
+      margin-right: 6px;
+      position: relative;
+      transition: all 0.2s ease;
+    }
+
+    .type-option input:checked+span {
+      border-color: #0078d4;
+      background: #0078d4;
+    }
+
+    .type-option em {
+      font-style: normal;
+    }
+
+    /* 进度条样式 */
+    progress {
+      width: 100%;
+      height: 20px;
+      border-radius: 10px;
+      overflow: hidden;
+      margin-bottom: 10px;
+      appearance: none;
+    }
+
+    progress::-webkit-progress-bar {
+      background-color: #eee;
+      border-radius: 10px;
+    }
+
+    progress::-webkit-progress-value {
+      background-color: #0078d4;
+      border-radius: 10px;
+    }
+
+    progress::-moz-progress-bar {
+      background-color: #0078d4;
+      border-radius: 10px;
+    }
+
+    #progressText {
+      text-align: right;
+      font-size: 12px;
+      color: #555;
+      margin-bottom: 10px;
+    }
+  </style>
+</head>
+
+<body>
+  <div id="container">
+    <h1>ACG VN Recommender</h1>
+    <textarea id="desc"
+      placeholder="输入你喜欢的剧情、角色类型、设定等.../Describe the story, characters, or settings you like..."></textarea>
+
+    <div class="type-switch">
+      <label class="type-option">
+        <input type="radio" name="type" value="GALGAME" checked>
+        <span></span>
+        <em>GALGAME</em>
+      </label>
+
+      <label class="type-option">
+        <input type="radio" name="type" value="ANIME">
+        <span></span>
+        <em>ANIME</em>
+      </label>
+
+      <label class="type-option">
+        <input type="radio" name="type" value="MANGA">
+        <span></span>
+        <em>MANGA</em>
+      </label>
+    </div>
+
+    <div class="type-switch">
+      <label class="type-option">
+        <input type="radio" name="mode" value="ROUGH" checked>
+        <span></span>
+        <em>粗略模式/ROUGH MODE</em>
+      </label>
+      <label class="type-option">
+        <input type="radio" name="mode" value="PRECISE">
+        <span></span>
+        <em>精准模式/PRECISE MODE</em>
+      </label>
+    </div>
+
+    <button id="searchBtn" class="searchBtn">搜索/Search</button>
+    <progress id="progressBar" value="0" max="100" style="display:none;"></progress>
+    <div id="progressText"></div>
+
+    <div id="results"></div>
+    <button id="loadMore" style="display:none;">加载更多/Load More</button>
+  </div>
+
+  <script>
+    const searchBtn = document.getElementById("searchBtn");
+    const desc = document.getElementById("desc");
+    const results = document.getElementById("results");
+    const loadMoreBtn = document.getElementById("loadMore");
+
+    // ===== 状态 =====
+    let allResults = [];
+    let currentPage = 1;
+    const pageSize = 20;
+
+    // ===== 进度条（精准模式用）=====
+    const progressBar = document.createElement("progress");
+    progressBar.max = 100;
+    progressBar.value = 0;
+    progressBar.style.width = "100%";
+    progressBar.style.display = "none";
+    results.before(progressBar);
+
+    // ======================================================
+    // 工具：绑定展开/收起
+    function bindToggle() {
+      results.querySelectorAll(".toggleBtn").forEach(btn => {
+        btn.onclick = () => {
+          const card = btn.closest(".vn-card");
+          const shortP = card.querySelector(".desc-short");
+          const fullP = card.querySelector(".desc-full");
+          const open = fullP.style.display === "block";
+          fullP.style.display = open ? "none" : "block";
+          shortP.style.display = open ? "block" : "none";
+          btn.textContent = open ? "展开" : "收起";
+        };
+      });
+    }
+
+    // ======================================================
+    // 【粗略模式】分页渲染
+    function renderRoughPage() {
+      const start = (currentPage - 1) * pageSize;
+      const end = currentPage * pageSize;
+      const pageData = allResults.slice(start, end);
+
+      results.innerHTML = pageData.map(renderCard).join("");
+      bindToggle();
+
+      loadMoreBtn.style.display =
+        end < allResults.length ? "block" : "none";
+    }
+
+    // ======================================================
+    // 【精准模式】流式追加渲染
+    function renderPreciseAppend(items) {
+      results.insertAdjacentHTML(
+        "beforeend",
+        items.map(renderCard).join("")
+      );
+      bindToggle();
+    }
+
+    // ======================================================
+    // 卡片模板（共用）
+    function renderCard(vn) {
+      const shortDesc = vn.description
+        ? vn.description.slice(0, 200) + "..."
+        : "暂无描述";
+      const fullDesc = vn.description || "";
+      const showToggle = vn.description && vn.description.length > 200;
+
+      if (vn.image) {
+        return `
+      <div class="vn-card" style="display:flex;gap:10px;">
+        <img src="${vn.image}" style="width:80px;height:120px;object-fit:cover;border-radius:6px;">
+        <div>
+          <h3>${vn.title}${vn.alttitle ? " / " + vn.alttitle : ""}</h3>
+          <p style="font-size:13px;color:#777;">
+            ⭐ ${vn.rating ?? "暂无"} / 10
+            ${vn.votecount ? `（${vn.votecount}人）` : ""}
+            | <a href="${vn.url}" target="_blank">查看</a>
+          </p>
+          <p class="desc-short">${shortDesc}</p>
+          <p class="desc-full" style="display:none;">${fullDesc}</p>
+          ${showToggle ? `<button class="toggleBtn">展开</button>` : ""}
+        </div>
+      </div>`;
+      }
+
+      return `
+    <div class="vn-card">
+      <h3>${vn.title}${vn.alttitle ? " / " + vn.alttitle : ""}</h3>
+      <p style="font-size:13px;color:#777;">
+        ⭐ ${vn.rating ?? "暂无"} / 10
+        ${vn.votecount ? `（${vn.votecount}人）` : ""}
+        | <a href="${vn.url}" target="_blank">查看</a>
+      </p>
+      <p class="desc-short">${shortDesc}</p>
+      <p class="desc-full" style="display:none;">${fullDesc}</p>
+      ${showToggle ? `<button class="toggleBtn">展开</button>` : ""}
+    </div>`;
+    }
+
+    // ======================================================
+    // 搜索
+    searchBtn.onclick = async () => {
+      const text = desc.value.trim();
+      const type = document.querySelector('input[name="type"]:checked').value;
+      const mode = document.querySelector('input[name="mode"]:checked').value;
+      //console.log("🔥 CLICK search-stream, mode =", mode);
+      if (!text) return alert("请输入描述");
+
+      // reset
+      results.innerHTML = "";
+      allResults = [];
+      currentPage = 1;
+      loadMoreBtn.style.display = "none";
+      progressBar.style.display = "none";
+      progressBar.value = 0;
+
+      try {
+        // ================= 粗略模式 =================
+        if (mode === "ROUGH") {
+          const res = await fetch("/search", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ text, type })
+          });
+          const data = await res.json();
+
+          allResults = data.results || [];
+          if (!allResults.length) {
+            results.innerHTML = "<p>未找到相关内容 😢</p>";
+            return;
+          }
+
+          renderRoughPage();
+        }
+
+        // ================= 精准模式 =================
+        if (mode === "PRECISE") {
+          progressBar.style.display = "block";
+
+          const res = await fetch("/search-stream", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ text, type })
+          });
+
+          const reader = res.body.getReader();
+          const decoder = new TextDecoder("utf-8");
+          let buffer = "";
+
+          while (true) {
+            const { value, done } = await reader.read();
+            if (done) break;
+
+            buffer += decoder.decode(value, { stream: true });
+            const lines = buffer.split("\n");
+            buffer = lines.pop();
+
+            for (const line of lines) {
+              if (!line.trim()) continue;
+              const msg = JSON.parse(line);
+
+              if (msg.type === "progress") {
+                allResults.push(...msg.results);
+                progressBar.value = msg.progress;
+                renderPreciseAppend(msg.results);
+              }
+
+              if (msg.type === "end") {
+                progressBar.style.display = "none";
+              }
+            }
+          }
+
+          if (!allResults.length) {
+            results.innerHTML = "<p>未找到相关内容 😢</p>";
+          }
+        }
+      } catch (e) {
+        console.error(e);
+        results.innerHTML = "<p style='color:red'>请求失败</p>";
+        progressBar.style.display = "none";
+      }
+    };
+
+    // ======================================================
+    // Load More（只给粗略模式）
+    loadMoreBtn.onclick = () => {
+      currentPage++;
+      renderRoughPage();
+    };
+  </script>
+
+
+  <!-- <script>
+    const searchBtn = document.getElementById("searchBtn");
+    const desc = document.getElementById("desc");
+    const results = document.getElementById("results");
+    const loadMoreBtn = document.getElementById("loadMore");
+
+
+    let allResults = [];
+    let currentPage = 1;
+    const pageSize = 20;
+
+    // 创建并插入进度条
+    let progressBar = document.createElement("progress");
+    progressBar.max = 100;
+    progressBar.value = 0;
+    progressBar.style.width = "100%";
+    progressBar.style.display = "none";
+    results.before(progressBar);
+    
+ 
+    function renderPage() {
+      const start = (currentPage - 1) * pageSize;
+      const end = currentPage * pageSize;
+      const pageData = allResults.slice(start, end);
+
+      results.innerHTML = pageData.map(vn => {
+        const shortDesc = vn.description ? vn.description.substring(0, 200) + "..." : "暂无描述";
+        const fullDesc = vn.description || "";
+        const showToggle = vn.description && vn.description.length > 200;
+
+        if (vn.image) {
+          // ANIME / MANGA 卡片
+          return `
+      <div class="vn-card" style="display:flex; gap:10px;">
+        <img src="${vn.image}" alt="${vn.title}" style="width:80px;height:120px;object-fit:cover;border-radius:6px;">
+        <div class="info">
+          <h3>${vn.title}${vn.alttitle ? ` / ${vn.alttitle}` : ""}</h3>
+          <p style="font-size:13px;color:#777;">
+            ⭐ 评分：${vn.rating ?? "暂无"} / 10
+            ${vn.votecount ? `（${vn.votecount} 人评价）` : ""}
+            |
+            <a href="${vn.url}" target="_blank">查看</a>
+          </p>
+          <p class="desc-short">${shortDesc}</p>
+          <p class="desc-full" style="display:none;">${fullDesc}</p>
+          ${showToggle ? '<button class="toggleBtn">展开</button>' : ''}
+        </div>
+      </div>
+      `;
+        } else {
+          // GALGAME 卡片
+          return `
+      <div class="vn-card">
+        <h3>${vn.title}${vn.alttitle ? ` / ${vn.alttitle}` : ""}</h3>
+        <p style="font-size:13px;color:#777;">
+          ⭐ 评分：${vn.rating ?? "暂无"} / 10
+          ${vn.votecount ? `（${vn.votecount} 人评价）` : ""}
+          |
+          <a href="${vn.url}" target="_blank">查看</a>
+        </p>
+        <p class="desc-short">${shortDesc}</p>
+        <p class="desc-full" style="display:none;">${fullDesc}</p>
+        ${showToggle ? '<button class="toggleBtn">展开</button>' : ''}
+      </div>
+      `;
+        }
+      }).join("");
+
+      bindToggle();
+
+      loadMoreBtn.style.display = (currentPage * pageSize < allResults.length) ? "block" : "none";
+    }
+
+    function bindToggle() {
+      results.querySelectorAll(".toggleBtn").forEach(btn => {
+        btn.onclick = () => {
+          const card = btn.closest(".vn-card");
+          const shortP = card.querySelector(".desc-short");
+          const fullP = card.querySelector(".desc-full");
+          const isOpen = fullP.style.display === "block";
+          fullP.style.display = isOpen ? "none" : "block";
+          shortP.style.display = isOpen ? "block" : "none";
+          btn.textContent = isOpen ? "展开" : "收起";
+        };
+      });
+    }
+
+    searchBtn.addEventListener("click", async () => {
+      const text = desc.value.trim();
+      const type = document.querySelector('input[name="type"]:checked').value;
+      const mode = document.querySelector('input[name="mode"]:checked').value;
+
+      if (!text) return alert("请输入描述内容");
+
+      results.innerHTML = "";
+      allResults = [];
+      currentPage = 1;
+      loadMoreBtn.style.display = "none";
+      progressBar.value = 0;
+      progressBar.style.display = "block";
+
+      try {
+        const response = await fetch("/search-stream", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ text, type, mode })
+        });
+
+        if (!response.body) throw new Error("无法获取响应流");
+
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder("utf-8");
+        let buffer = "";
+
+        while (true) {
+          const { value, done } = await reader.read();
+          if (done) break;
+
+          buffer += decoder.decode(value, { stream: true });
+          let lines = buffer.split("\n");
+          buffer = lines.pop(); // 保留最后一行（可能不完整）
+
+          for (const line of lines) {
+            if (!line.trim()) continue;
+            let msg;
+            try { msg = JSON.parse(line); } catch { continue; }
+
+            if (msg.type === "progress") {
+              allResults.push(...msg.results);
+              progressBar.value = msg.progress;
+              renderPage();
+            } else if (msg.type === "end") {
+              progressBar.style.display = "none";
+              renderPage();
+            }
+          }
+        }
+
+        if (!allResults.length) {
+          results.innerHTML = "<p>未找到相关内容 😢</p>";
+          progressBar.style.display = "none";
+        }
+
+      } catch (err) {
+        console.error(err);
+        results.innerHTML = "<p style='color:red;'>请求失败</p>";
+        progressBar.style.display = "none";
+      }
+    });
+
+    loadMoreBtn.addEventListener("click", () => {
+      currentPage++;
+      renderPage();
+    });
+  </script> -->
+
+  <!-- <script>
+    const searchBtn = document.getElementById("searchBtn");
+    const desc = document.getElementById("desc");
+    const typeSelect = document.getElementById("type");
+    const results = document.getElementById("results");
+    const loadMoreBtn = document.getElementById("loadMore");
+
+    let allResults = [];
+    let currentPage = 1;
+    const pageSize = 20;
+
+    function renderPage() {
+      const start = (currentPage - 1) * pageSize;
+      const end = currentPage * pageSize;
+      const pageData = allResults.slice(start, end);
+
+      results.insertAdjacentHTML("beforeend", pageData.map(vn => {
+        const shortDesc = vn.description ? vn.description.substring(0, 200) + "..." : "暂无描述";
+        const fullDesc = vn.description || "";
+        const showToggle = vn.description && vn.description.length > 200;
+
+        if (vn.image) {
+          // ANIME / MANGA 卡片
+          return `
+          <div class="vn-card" style="display:flex; gap:10px;">
+            <img src="${vn.image}" alt="${vn.title}" style="width:80px;height:120px;object-fit:cover;border-radius:6px;">
+            <div class="info">
+              <h3>${vn.title}${vn.alttitle ? ` / ${vn.alttitle}` : ""}</h3>
+              <p style="font-size:13px;color:#777;">
+                ⭐ 评分：${vn.rating ?? "暂无"} / 10
+                ${vn.votecount ? `（${vn.votecount} 人评价）` : ""}
+                |
+                <a href="${vn.url}" target="_blank">查看</a>
+              </p>
+              <p class="desc-short">${shortDesc}</p>
+              <p class="desc-full" style="display:none;">${fullDesc}</p>
+              ${showToggle ? '<button class="toggleBtn">展开</button>' : ''}
+            </div>
+          </div>
+          `;
+        } else {
+          // GALGAME 卡片
+          return `
+          <div class="vn-card">
+            <h3>${vn.title}${vn.alttitle ? ` / ${vn.alttitle}` : ""}</h3>
+            <p style="font-size:13px;color:#777;">
+              ⭐ 评分：${vn.rating ?? "暂无"} / 10
+              ${vn.votecount ? `（${vn.votecount} 人评价）` : ""}
+              |
+              <a href="${vn.url}" target="_blank">查看</a>
+            </p>
+            <p class="desc-short">${shortDesc}</p>
+            <p class="desc-full" style="display:none;">${fullDesc}</p>
+            ${showToggle ? '<button class="toggleBtn">展开</button>' : ''}
+          </div>
+          `;
+        }
+      }).join(""));
+
+      bindToggle();
+
+      if (end >= allResults.length) {
+        loadMoreBtn.style.display = "none";
+      }
+    }
+
+    function bindToggle() {
+      results.querySelectorAll(".toggleBtn").forEach(btn => {
+        btn.onclick = () => {
+          const card = btn.closest(".vn-card");
+          const shortP = card.querySelector(".desc-short");
+          const fullP = card.querySelector(".desc-full");
+          const isOpen = fullP.style.display === "block";
+          fullP.style.display = isOpen ? "none" : "block";
+          shortP.style.display = isOpen ? "block" : "none";
+          btn.textContent = isOpen ? "展开" : "收起";
+        };
+      });
+    }
+
+    searchBtn.addEventListener("click", async () => {
+      const text = desc.value.trim();
+      const type = document.querySelector('input[name="type"]:checked').value;
+
+      if (!text) return alert("请输入描述内容");
+
+      results.innerHTML = "<p>正在查询...</p>";
+      loadMoreBtn.style.display = "none";
+      currentPage = 1;
+
+      try {
+        const res = await fetch("/search", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ text, type })
+        });
+
+        const data = await res.json();
+        if (!data.results || !data.results.length) {
+          results.innerHTML = "<p>未找到相关内容 😢</p>";
+          return;
+        }
+
+        allResults = data.results;
+        results.innerHTML = "";
+        renderPage();
+
+        if (allResults.length > pageSize) {
+          loadMoreBtn.style.display = "block";
+        }
+
+      } catch (err) {
+        console.error(err);
+        results.innerHTML = "<p style='color:red;'>请求失败</p>";
+      }
+    });
+
+    loadMoreBtn.addEventListener("click", () => {
+      currentPage++;
+      renderPage();
+    });
+  </script> -->
+
+  <!-- ✅ Vercel Speed Insights -->
+  <script defer src="https://va.vercel-scripts.com/v1/speed-insights/script.js"></script>
+
+</body>
+
+</html>
