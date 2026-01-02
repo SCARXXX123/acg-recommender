@@ -1,4 +1,4 @@
-ACG VN Recommender
+ACG VN Recommender (https://acg-reconmmander.vercel.app/)
 中文介绍
 
 ACG VN Recommender 是一个基于用户描述的视觉小说、动画和漫画推荐系统。用户可以输入喜欢的剧情、角色类型或设定，系统会智能分析并返回最匹配的推荐结果。
